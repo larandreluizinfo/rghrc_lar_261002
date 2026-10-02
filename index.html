@@ -67,6 +67,10 @@
     <label>🔵 P1: <select id="timeP1"></select></label>
     <label id="labelTime2">🔴 CPU: <select id="timeP2"></select></label>
   </div>
+  <div id="controles">
+    <label>🎮 P1 joga com: <select id="ctrlP1"></select></label>
+    <label id="labelCtrl2">🎮 P2 joga com: <select id="ctrlP2"></select></label>
+  </div>
 
   <div id="wrap">
     <canvas id="jogo" width="900" height="560"></canvas>
@@ -86,6 +90,7 @@
     <p>🔴 <b>P2 (Vermelho):</b> <b>Setas ←↑↓→</b> mover • <b>Shift Direito</b> correr • segure <b>ENTER</b> e solte p/ chutar • <b>.</b> (ponto) passe.</p>
     <p>📱 <b>No celular (2 jogadores):</b> um dedo arrasta do <b>lado esquerdo</b> = move o P1, outro dedo arrasta do <b>lado direito</b> = move o P2. Use os botões <b>CHUTE/PASSE</b> (P1, canto direito) e <b>CHUTE P2/PASSE P2</b> (P2, canto esquerdo).</p>
     <p>👕 <b>Escolha os times:</b> P1 escolhe o seu time e o P2 (ou a CPU) escolhe o dele — Brasil, Argentina, França, Alemanha, Espanha, Portugal, Holanda ou Inglaterra. Se os dois escolherem o mesmo, o P2 joga de cinza (uniforme reserva). Aperte <b>Iniciar</b> após escolher!</p>
+    <p>🎮 <b>Escolha seu jogador:</b> em <b>"P1 joga com"</b> e <b>"P2 joga com"</b> dá para jogar no <b>Automático</b> (troca sozinho para quem está mais perto da bola) ou travar num jogador fixo — <b>Goleiro 1, Zagueiro 2, Zagueiro 4, Meia 8 ou Atacante 9</b>. Quer ser o goleiro e defender tudo? É só escolher! (No X1 não precisa: cada um já tem seu único jogador.)</p>
     <p>📏 <b>Realismo:</b> 5x5 com goleiros, lateral, escanteio, tiro de meta, drible colado no pé, curva na bola (efeito), cansaço, rede do gol, torcida e confete no gol.</p>
   </div>
 
@@ -135,6 +140,32 @@ function popularTimes() {
 function atualizarLabelsTimes() {
   const l2 = document.getElementById('labelTime2');
   if (l2) l2.childNodes[0].textContent = ehPvP() ? '🔴 P2: ' : '🔴 CPU: ';
+  const c2 = document.getElementById('ctrlP2');
+  if (c2) c2.disabled = !ehPvP();
+  const lc2 = document.getElementById('labelCtrl2');
+  if (lc2) lc2.style.opacity = ehPvP() ? '1' : '0.4';
+}
+
+// ---------- ESCOLHA DO JOGADOR CONTROLADO ----------
+const elCtrlP1 = document.getElementById('ctrlP1');
+const elCtrlP2 = document.getElementById('ctrlP2');
+const OPCOES_JOGADOR = [
+  { v: -1, t: 'Automático (mais perto da bola)' },
+  { v: 0, t: 'Goleiro 1 🧤' },
+  { v: 1, t: 'Zagueiro 2 🛡️' },
+  { v: 2, t: 'Zagueiro 4 🛡️' },
+  { v: 3, t: 'Meia 8 🎯' },
+  { v: 4, t: 'Atacante 9 ⚽' },
+];
+let fixoA = -1, fixoB = -1; // -1 = automático
+function popularControles() {
+  [elCtrlP1, elCtrlP2].forEach(el => {
+    OPCOES_JOGADOR.forEach(o => {
+      const op = document.createElement('option');
+      op.value = o.v; op.textContent = o.t;
+      el.appendChild(op);
+    });
+  });
 }
 
 let somLigado = true, audioCtx = null, crowdGain = null;
@@ -235,6 +266,8 @@ function resetPosicoes(kickoffTeam = -1) {
 function iniciar() {
   modo = elModo.value; tempoTotal = parseInt(elDur.value, 10);
   selA = parseInt(elTimeP1.value, 10); selB = parseInt(elTimeP2.value, 10);
+  fixoA = parseInt(elCtrlP1.value, 10); fixoB = parseInt(elCtrlP2.value, 10);
+  if (modo === 'x1') { fixoA = -1; fixoB = -1; } // X1: só há 1 jogador por lado
   atualizarLabelsTimes();
   times = modo === 'x1' ? [formarX1(0), formarX1(1)] : [formarTime(0), formarTime(1)];
   bola = { x: FX + FW / 2, y: FY + FH / 2, vx: 0, vy: 0, spin: 0, ang: 0, lastTouch: -1 };
@@ -530,10 +563,10 @@ function passoFisica(dt) {
   }
   if (bola.y < FY - 4 || bola.y > FY + FH + 4) lateral();
 
-  // troca automática de controlado
+  // quem cada pessoa controla: fixo (escolhido) ou automático (mais perto da bola)
   if (jogando) {
-    ctrlA = controlado(0);
-    ctrlV = controlado(1);
+    ctrlA = (fixoA >= 0 && times[0][fixoA]) ? times[0][fixoA] : controlado(0);
+    ctrlV = (ehPvP() && fixoB >= 0 && times[1][fixoB]) ? times[1][fixoB] : controlado(1);
     times[0].forEach(p => p.controle = (p === ctrlA));
     times[1].forEach(p => p.controle = (ehPvP() && p === ctrlV));
   }
@@ -815,6 +848,7 @@ elDur.addEventListener('change', iniciar);
 
 // estado inicial (vitrine)
 popularTimes();
+popularControles();
 atualizarLabelsTimes();
 times = [formarTime(0), formarTime(1)];
 bola = { x: FX + FW / 2, y: FY + FH / 2, vx: 1.5, vy: 0.8, spin: 0, ang: 0, lastTouch: -1 };
