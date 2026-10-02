@@ -51,7 +51,7 @@
 
   <div id="controles">
     <select id="modo">
-      <option value="cpu">1 Jogador (Azul vs CPU)</option>
+      <option value="cpu">1 Jogador (P1 vs CPU)</option>
       <option value="2p">2 Jogadores — P1 x P2 (5x5)</option>
       <option value="x1">X1 — P1 x P2 (1 contra 1)</option>
     </select>
@@ -62,6 +62,10 @@
     </select>
     <button id="btnIniciar">▶ Iniciar / Reiniciar</button>
     <button id="btnSom" style="background:#fff">🔊 Som</button>
+  </div>
+  <div id="controles">
+    <label>🔵 P1: <select id="timeP1"></select></label>
+    <label id="labelTime2">🔴 CPU: <select id="timeP2"></select></label>
   </div>
 
   <div id="wrap">
@@ -81,6 +85,7 @@
     <p>🔵 <b>P1 (Azul):</b> <b>W A S D</b> mover • <b>Shift Esquerdo</b> correr • segure <b>ESPAÇO</b> e solte p/ chutar • <b>Q</b> passe.</p>
     <p>🔴 <b>P2 (Vermelho):</b> <b>Setas ←↑↓→</b> mover • <b>Shift Direito</b> correr • segure <b>ENTER</b> e solte p/ chutar • <b>.</b> (ponto) passe.</p>
     <p>📱 <b>No celular (2 jogadores):</b> um dedo arrasta do <b>lado esquerdo</b> = move o P1, outro dedo arrasta do <b>lado direito</b> = move o P2. Use os botões <b>CHUTE/PASSE</b> (P1, canto direito) e <b>CHUTE P2/PASSE P2</b> (P2, canto esquerdo).</p>
+    <p>👕 <b>Escolha os times:</b> P1 escolhe o seu time e o P2 (ou a CPU) escolhe o dele — Brasil, Argentina, França, Alemanha, Espanha, Portugal, Holanda ou Inglaterra. Se os dois escolherem o mesmo, o P2 joga de cinza (uniforme reserva). Aperte <b>Iniciar</b> após escolher!</p>
     <p>📏 <b>Realismo:</b> 5x5 com goleiros, lateral, escanteio, tiro de meta, drible colado no pé, curva na bola (efeito), cansaço, rede do gol, torcida e confete no gol.</p>
   </div>
 
@@ -101,6 +106,36 @@ const elMsg = document.getElementById('msg');
 const elModo = document.getElementById('modo');
 const elDur = document.getElementById('duracao');
 const elForca = document.getElementById('forcaFill');
+const elTimeP1 = document.getElementById('timeP1');
+const elTimeP2 = document.getElementById('timeP2');
+
+// ---------- SELEÇÃO DE TIMES ----------
+const TEAMS = [
+  { nome: 'Brasil',     cor: '#ffd400', short: '#1e40ff', num: '#1e40ff', borda: '#1e40ff' },
+  { nome: 'Argentina',  cor: '#7dd3fc', short: '#111111', num: '#0f172a', borda: '#0f172a' },
+  { nome: 'França',     cor: '#1d4ed8', short: '#ffffff', num: '#ffffff', borda: '#ffffff' },
+  { nome: 'Alemanha',   cor: '#f8fafc', short: '#111111', num: '#111111', borda: '#111111' },
+  { nome: 'Espanha',    cor: '#dc2626', short: '#1e40ff', num: '#ffd400', borda: '#ffffff' },
+  { nome: 'Portugal',   cor: '#b91c1c', short: '#166534', num: '#ffffff', borda: '#ffffff' },
+  { nome: 'Holanda',    cor: '#f97316', short: '#111111', num: '#ffffff', borda: '#ffffff' },
+  { nome: 'Inglaterra', cor: '#f1f5f9', short: '#1e3a8a', num: '#1e3a8a', borda: '#1e3a8a' },
+];
+const AWAY_KIT = { nome: '', cor: '#9ca3af', short: '#111111', num: '#111111', borda: '#111111' };
+let selA = 0, selB = 1; // Brasil x Argentina
+function kitTime(idx, visitante) { return visitante ? AWAY_KIT : TEAMS[idx]; }
+function nomeEscolhido(t) { return TEAMS[t === 0 ? selA : selB].nome; }
+function popularTimes() {
+  TEAMS.forEach((t, i) => {
+    const o1 = document.createElement('option'); o1.value = i; o1.textContent = t.nome;
+    const o2 = document.createElement('option'); o2.value = i; o2.textContent = t.nome;
+    elTimeP1.appendChild(o1); elTimeP2.appendChild(o2);
+  });
+  elTimeP1.value = selA; elTimeP2.value = selB;
+}
+function atualizarLabelsTimes() {
+  const l2 = document.getElementById('labelTime2');
+  if (l2) l2.childNodes[0].textContent = ehPvP() ? '🔴 P2: ' : '🔴 CPU: ';
+}
 
 let somLigado = true, audioCtx = null, crowdGain = null;
 let times, bola, golsA, golsV, tempoRest, tempoTotal, jogando, modo = 'cpu';
@@ -138,9 +173,10 @@ function somGol() {
 }
 
 // ---------- TIMES ----------
-function formarTime(lado) { // lado: 0 azul (ataca ->), 1 vermelho (ataca <-)
+function formarTime(lado) { // lado: 0 = P1 (ataca ->), 1 = P2/CPU (ataca <-)
   const e = lado === 0;
   const bx = v => e ? FX + FW * v : FX + FW * (1 - v);
+  const kit = kitTime(lado === 0 ? selA : selB, lado === 1 && selA === selB);
   return [
     { role: 'GOL', hx: 0.04, hy: 0.50, vel: 3.9, num: 1 },
     { role: 'DEF', hx: 0.20, hy: 0.30, vel: 4.1, num: 2 },
@@ -153,30 +189,35 @@ function formarTime(lado) { // lado: 0 azul (ataca ->), 1 vermelho (ataca <-)
     x: bx(f.hx), y: FY + FH * f.hy, vx: 0, vy: 0,
     face: e ? 0 : Math.PI, stamina: 1, anim: Math.random() * 10,
     controle: false, tackleCd: 0,
-    cor: lado === 0 ? '#1e6bff' : '#e02626',
-    corShort: lado === 0 ? '#ffffff' : '#111111',
+    cor: kit.cor,
+    corShort: kit.short,
+    corNum: kit.num,
+    corBorda: kit.borda,
   }));
 }
 
 // PvP = duas pessoas jogando uma contra a outra (2p ou x1)
 function ehPvP() { return modo === '2p' || modo === 'x1'; }
-function nomeT(t) { return t === 0 ? (ehPvP() ? 'o P1 (AZUL)' : 'o AZUL') : (ehPvP() ? 'o P2 (VERMELHO)' : 'o VERMELHO'); }
+function nomeT(t) { const n = nomeEscolhido(t); return ehPvP() ? (t === 0 ? `o P1 (${n})` : `o P2 (${n})`) : `o ${n}`; }
 function atacante(t) { return times[t][times[t].length - 1]; }
 function goleiro(t) { return times[t][0]; }
 
 // X1: só P1 contra P2, sem goleiros nem ajudantes
-function formarX1(lado) { // lado: 0 azul (ataca ->), 1 vermelho (ataca <-)
+function formarX1(lado) { // lado: 0 = P1 (ataca ->), 1 = P2/CPU (ataca <-)
   const e = lado === 0;
   const f = { role: 'X1', hx: 0.42, hy: 0.50, vel: 5.0, num: 10 };
   const bx = e ? FX + FW * f.hx : FX + FW * (1 - f.hx);
+  const kit = kitTime(lado === 0 ? selA : selB, lado === 1 && selA === selB);
   return [{
     team: lado, idx: 0, role: f.role, num: f.num, velBase: f.vel,
     hx: bx, hy: FY + FH * f.hy,
     x: bx, y: FY + FH * f.hy, vx: 0, vy: 0,
     face: e ? 0 : Math.PI, stamina: 1, anim: Math.random() * 10,
     controle: false, tackleCd: 0,
-    cor: lado === 0 ? '#1e6bff' : '#e02626',
-    corShort: lado === 0 ? '#ffffff' : '#111111',
+    cor: kit.cor,
+    corShort: kit.short,
+    corNum: kit.num,
+    corBorda: kit.borda,
   }];
 }
 
@@ -193,6 +234,8 @@ function resetPosicoes(kickoffTeam = -1) {
 
 function iniciar() {
   modo = elModo.value; tempoTotal = parseInt(elDur.value, 10);
+  selA = parseInt(elTimeP1.value, 10); selB = parseInt(elTimeP2.value, 10);
+  atualizarLabelsTimes();
   times = modo === 'x1' ? [formarX1(0), formarX1(1)] : [formarTime(0), formarTime(1)];
   bola = { x: FX + FW / 2, y: FY + FH / 2, vx: 0, vy: 0, spin: 0, ang: 0, lastTouch: -1 };
   golsA = 0; golsV = 0; tempoRest = tempoTotal; jogando = true;
@@ -210,8 +253,10 @@ function iniciar() {
 
 function mensagem(t, seg = 1.6) { elMsg.textContent = t; msgTimer = seg; }
 function atualizarPlacar() {
-  elAzul.textContent = ehPvP() ? `🔵 P1 AZUL ${golsA}` : `🔵 AZUL ${golsA}`;
-  elVermelho.textContent = ehPvP() ? `P2 VERMELHO ${golsV} 🔴` : `VERMELHO ${golsV} 🔴`;
+  elAzul.textContent = (ehPvP() ? `🔵 P1 ${nomeEscolhido(0)}` : `⚽ ${nomeEscolhido(0)}`) + ` ${golsA}`;
+  elVermelho.textContent = (ehPvP() ? `P2 ${nomeEscolhido(1)}` : `CPU ${nomeEscolhido(1)}`) + ` ${golsV} 🔴`;
+  elAzul.style.borderTopColor = TEAMS[selA].cor;
+  elVermelho.style.borderTopColor = TEAMS[selB].cor;
   const m = String(Math.floor(Math.max(0, tempoRest) / 60)).padStart(2, '0');
   const s = String(Math.floor(Math.max(0, tempoRest) % 60)).padStart(2, '0');
   elTempo.textContent = `${m}:${s}`;
@@ -562,7 +607,7 @@ function gol(team) {
   if (team === 0) golsA++; else golsV++;
   jogando = false; // pausa curta
   somGol(); cameraShake = 8;
-  mensagem(team === 0 ? `⚽ GOOOOL D${ehPvP() ? 'O P1' : 'O AZUL'}!!! 🎉` : `⚽ GOOOOL D${ehPvP() ? 'O P2' : 'O VERMELHO'}!!! 🎉`, 2.5);
+  mensagem(`⚽ GOOOOL ${nomeEscolhido(team).toUpperCase()}!!! 🎉` + (ehPvP() ? (team === 0 ? ' (P1)' : ' (P2)') : ''), 2.5);
   for (let i = 0; i < 120; i++) confetes.push({
     x: bola.x, y: bola.y,
     vx: (Math.random() - 0.5) * 7, vy: Math.random() * -6 - 1,
@@ -691,7 +736,7 @@ function desenharJogador(p) {
   // corpo / camisa
   ctx.beginPath(); ctx.arc(p.x, p.y, PR, 0, Math.PI * 2);
   ctx.fillStyle = p.cor; ctx.fill();
-  ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffffffdd'; ctx.stroke();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = p.corBorda || '#ffffffdd'; ctx.stroke();
   // faixa do short
   ctx.fillStyle = p.corShort;
   ctx.fillRect(p.x - PR + 3, p.y + 4, PR * 2 - 6, 7);
@@ -700,7 +745,7 @@ function desenharJogador(p) {
   ctx.fillStyle = '#f2c89b'; ctx.fill();
   ctx.strokeStyle = '#00000055'; ctx.lineWidth = 1.5; ctx.stroke();
   // número
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = p.corNum || '#fff'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(String(p.num), p.x, p.y + 1);
   // barra de fôlego do controlado
   if (p.controle) {
@@ -744,7 +789,7 @@ function loop(t) {
     if (tempoRest <= 0) {
       tempoRest = 0; jogando = false;
       somApito(3);
-      const v = golsA > golsV ? (ehPvP() ? '🔵 P1 (AZUL) VENCEU! 🏆' : '🔵 AZUL VENCEU! 🏆') : golsV > golsA ? (ehPvP() ? '🔴 P2 (VERMELHO) VENCEU! 🏆' : '🔴 VERMELHO VENCEU! 🏆') : '🤝 EMPATE!';
+      const v = golsA > golsV ? `🏆 ${nomeEscolhido(0).toUpperCase()} VENCEU!${ehPvP() ? ' (P1 🔵)' : ''}` : golsV > golsA ? `🏆 ${nomeEscolhido(1).toUpperCase()} VENCEU!${ehPvP() ? ' (P2 🔴)' : ''}` : '🤝 EMPATE!';
       mensagem('FIM DE JOGO — ' + v, 999);
     }
     passoFisica(dt);
@@ -769,6 +814,8 @@ elModo.addEventListener('change', iniciar);
 elDur.addEventListener('change', iniciar);
 
 // estado inicial (vitrine)
+popularTimes();
+atualizarLabelsTimes();
 times = [formarTime(0), formarTime(1)];
 bola = { x: FX + FW / 2, y: FY + FH / 2, vx: 1.5, vy: 0.8, spin: 0, ang: 0, lastTouch: -1 };
 golsA = 0; golsV = 0; tempoRest = 180; jogando = false;
