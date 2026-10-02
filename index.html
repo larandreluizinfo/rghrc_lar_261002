@@ -28,6 +28,10 @@
     #btnsMobile button { width: 74px; height: 74px; border-radius: 50%; font-size: 13px; opacity: .92; }
     #btnChute { background: #ff2e2e !important; color: #fff !important; }
     #btnPasse { background: #1e6bff !important; color: #fff !important; }
+    #btnsMobile2 { display: none; position: absolute; left: 10px; bottom: 12px; gap: 10px; }
+    #btnsMobile2 button { width: 74px; height: 74px; border-radius: 50%; font-size: 13px; opacity: .92; }
+    #btnChute2 { background: #ff2e2e !important; color: #fff !important; }
+    #btnPasse2 { background: #1e6bff !important; color: #fff !important; }
     @media (pointer: coarse) { #btnsMobile { display: flex; } }
   </style>
 </head>
@@ -61,6 +65,10 @@
 
   <div id="wrap">
     <canvas id="jogo" width="900" height="560"></canvas>
+    <div id="btnsMobile2">
+      <button id="btnChute2">CHUTE P2</button>
+      <button id="btnPasse2">PASSE P2</button>
+    </div>
     <div id="btnsMobile">
       <button id="btnPasse">PASSE</button>
       <button id="btnChute">CHUTE</button>
@@ -68,9 +76,11 @@
   </div>
 
   <div id="ajuda">
-    <p>🎮 <b>Jogador 1 (Azul):</b> <b>WASD</b> mover • <b>Shift</b> correr (gasta fôlego) • segure <b>ESPAÇO</b> p/ carregar o chute, solte p/ chutar • <b>Q</b> passe • No celular: arraste o lado esquerdo + botões.</p>
-    <p>🎮 <b>Jogador 2 / CPU (Vermelho):</b> <b>Setas</b> mover • <b>Shift Direito</b> correr • segure <b>Enter</b> p/ chute • <b>/</b> ou <b>Shift</b>? use <b>Ponto (.)</b> passe. Você controla o jogador com o <b>círculo branco</b> — troca automática para o mais próximo da bola.</p>
-    <p>📏 <b>Realismo:</b> 5x5 com goleiros, lateral, escanteio, tiro de meta, impedimento desligado, drible colado no pé, curva na bola (efeito), cansaço, rede do gol, torcida e confete no gol.</p>
+    <p>👥 <b>2 JOGADORES ao mesmo tempo:</b> escolha <b>"2 Jogadores"</b> acima e aperte <b>Iniciar</b>. O <b>P1</b> controla o azul (anel <b style="color:#fff">branco</b>) e o <b>P2</b> controla o vermelho (anel <b style="color:#ffd400">amarelo</b>) — cada um troca sozinho para o jogador mais perto da bola.</p>
+    <p>🔵 <b>P1 (Azul):</b> <b>W A S D</b> mover • <b>Shift Esquerdo</b> correr • segure <b>ESPAÇO</b> e solte p/ chutar • <b>Q</b> passe.</p>
+    <p>🔴 <b>P2 (Vermelho):</b> <b>Setas ←↑↓→</b> mover • <b>Shift Direito</b> correr • segure <b>ENTER</b> e solte p/ chutar • <b>.</b> (ponto) passe.</p>
+    <p>📱 <b>No celular (2 jogadores):</b> um dedo arrasta do <b>lado esquerdo</b> = move o P1, outro dedo arrasta do <b>lado direito</b> = move o P2. Use os botões <b>CHUTE/PASSE</b> (P1, canto direito) e <b>CHUTE P2/PASSE P2</b> (P2, canto esquerdo).</p>
+    <p>📏 <b>Realismo:</b> 5x5 com goleiros, lateral, escanteio, tiro de meta, drible colado no pé, curva na bola (efeito), cansaço, rede do gol, torcida e confete no gol.</p>
   </div>
 
 <script>
@@ -166,7 +176,10 @@ function iniciar() {
   confetes = []; charge.p1 = 0; charge.p2 = 0;
   resetPosicoes(0);
   ctrlA = times[0][4]; ctrlV = times[1][4];
-  mensagem('COMEÇA O JOGO! ⚽', 2);
+  document.getElementById('btnsMobile2').style.display = modo === '2p' ? 'flex' : 'none';
+  document.getElementById('btnChute').textContent = modo === '2p' ? 'CHUTE P1' : 'CHUTE';
+  document.getElementById('btnPasse').textContent = modo === '2p' ? 'PASSE P1' : 'PASSE';
+  mensagem(modo === '2p' ? 'P1 (AZUL) x P2 (VERMELHO) — COMEÇA! ⚽' : 'COMEÇA O JOGO! ⚽', 2);
   somApito(1);
   ultimoT = performance.now();
   atualizarPlacar();
@@ -174,54 +187,82 @@ function iniciar() {
 
 function mensagem(t, seg = 1.6) { elMsg.textContent = t; msgTimer = seg; }
 function atualizarPlacar() {
-  elAzul.textContent = `🔵 AZUL ${golsA}`;
-  elVermelho.textContent = `VERMELHO ${golsV} 🔴`;
+  elAzul.textContent = modo === '2p' ? `🔵 P1 AZUL ${golsA}` : `🔵 AZUL ${golsA}`;
+  elVermelho.textContent = modo === '2p' ? `P2 VERMELHO ${golsV} 🔴` : `VERMELHO ${golsV} 🔴`;
   const m = String(Math.floor(Math.max(0, tempoRest) / 60)).padStart(2, '0');
   const s = String(Math.floor(Math.max(0, tempoRest) % 60)).padStart(2, '0');
   elTempo.textContent = `${m}:${s}`;
 }
 
-// ---------- ENTRADA ----------
+// ---------- ENTRADA (2 jogadores simultâneos, sem conflito) ----------
+// P1: WASD + Shift Esquerdo (corre) + ESPAÇO (chute) + Q (passe)
+// P2: Setas + Shift Direito (corre) + ENTER (chute) + . (passe)
+let shiftL = false, shiftR = false;
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   teclas[k] = true;
+  if (e.code === 'ShiftLeft') shiftL = true;
+  if (e.code === 'ShiftRight') shiftR = true;
   if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
-  if (k === ' ' && !charge.p1On && jogando && (modo === 'cpu' || modo === '2p')) { charge.p1On = true; charge.p1 = 0; }
+  if (k === ' ' && !charge.p1On && jogando) { charge.p1On = true; charge.p1 = 0; }
   if (k === 'enter' && !charge.p2On && jogando && modo === '2p') { charge.p2On = true; charge.p2 = 0; }
-  if (k === 'q') passe(0);
-  if (k === '.' || k === '/') passe(1);
+  if (!e.repeat) {
+    if (k === 'q' || k === 'f') passe(0);
+    if (k === '.' || k === '/' || k === ',') passe(1);
+  }
 });
 window.addEventListener('keyup', e => {
   const k = e.key.toLowerCase();
   teclas[k] = false;
+  if (e.code === 'ShiftLeft') shiftL = false;
+  if (e.code === 'ShiftRight') shiftR = false;
   if (k === ' ' && charge.p1On) { charge.p1On = false; chutar(0, 0.35 + charge.p1 * 0.65); charge.p1 = 0; }
   if (k === 'enter' && charge.p2On) { charge.p2On = false; chutar(1, 0.35 + charge.p2 * 0.65); charge.p2 = 0; }
 });
+window.addEventListener('blur', () => { for (const k in teclas) teclas[k] = false; shiftL = shiftR = false; });
 
-// toque: joystick esquerdo + botões
+// toque: 2 joysticks (esquerda = P1, direita = P2 no modo 2p) + botões
 let joy = { on: false, id: null, sx: 0, sy: 0, dx: 0, dy: 0 };
+let joy2 = { on: false, id: null, sx: 0, sy: 0, dx: 0, dy: 0 };
+function joyMove(j, t) {
+  j.dx = (t.clientX - j.sx) / 50; j.dy = (t.clientY - j.sy) / 50;
+  const l = Math.hypot(j.dx, j.dy); if (l > 1) { j.dx /= l; j.dy /= l; }
+}
 canvas.addEventListener('touchstart', e => {
+  const r = canvas.getBoundingClientRect();
   for (const t of e.changedTouches) {
-    const r = canvas.getBoundingClientRect();
-    if ((t.clientX - r.left) < r.width * 0.6 && !joy.on) {
+    const lx = (t.clientX - r.left) / r.width;
+    if (lx < 0.45 && !joy.on) {
+      joy.on = true; joy.id = t.identifier; joy.sx = t.clientX; joy.sy = t.clientY; joy.dx = 0; joy.dy = 0;
+    } else if (lx >= 0.45 && modo === '2p' && !joy2.on) {
+      joy2.on = true; joy2.id = t.identifier; joy2.sx = t.clientX; joy2.sy = t.clientY; joy2.dx = 0; joy2.dy = 0;
+    } else if (!joy.on) {
       joy.on = true; joy.id = t.identifier; joy.sx = t.clientX; joy.sy = t.clientY; joy.dx = 0; joy.dy = 0;
     }
   }
   e.preventDefault();
 }, { passive: false });
 canvas.addEventListener('touchmove', e => {
-  for (const t of e.changedTouches) if (joy.on && t.identifier === joy.id) {
-    joy.dx = (t.clientX - joy.sx) / 50; joy.dy = (t.clientY - joy.sy) / 50;
-    const l = Math.hypot(joy.dx, joy.dy); if (l > 1) { joy.dx /= l; joy.dy /= l; }
+  for (const t of e.changedTouches) {
+    if (joy.on && t.identifier === joy.id) joyMove(joy, t);
+    if (joy2.on && t.identifier === joy2.id) joyMove(joy2, t);
   }
   e.preventDefault();
 }, { passive: false });
-canvas.addEventListener('touchend', e => {
-  for (const t of e.changedTouches) if (joy.on && t.identifier === joy.id) { joy.on = false; joy.dx = 0; joy.dy = 0; }
-});
+function joyEnd(e) {
+  for (const t of e.changedTouches) {
+    if (joy.on && t.identifier === joy.id) { joy.on = false; joy.dx = 0; joy.dy = 0; }
+    if (joy2.on && t.identifier === joy2.id) { joy2.on = false; joy2.dx = 0; joy2.dy = 0; }
+  }
+}
+canvas.addEventListener('touchend', joyEnd);
+canvas.addEventListener('touchcancel', joyEnd);
 document.getElementById('btnChute').addEventListener('touchstart', e => { e.preventDefault(); charge.p1On = true; charge.p1 = 0; });
 document.getElementById('btnChute').addEventListener('touchend', e => { e.preventDefault(); charge.p1On = false; chutar(0, 0.35 + charge.p1 * 0.65); charge.p1 = 0; });
 document.getElementById('btnPasse').addEventListener('touchstart', e => { e.preventDefault(); passe(0); });
+document.getElementById('btnChute2').addEventListener('touchstart', e => { e.preventDefault(); charge.p2On = true; charge.p2 = 0; });
+document.getElementById('btnChute2').addEventListener('touchend', e => { e.preventDefault(); charge.p2On = false; chutar(1, 0.35 + charge.p2 * 0.65); charge.p2 = 0; });
+document.getElementById('btnPasse2').addEventListener('touchstart', e => { e.preventDefault(); passe(1); });
 
 // ---------- AÇÕES ----------
 function controlado(team) { return times[team].reduce((a, b) => dist(b, bola) < dist(a, bola) ? b : a); }
@@ -430,7 +471,7 @@ function passoFisica(dt) {
 }
 
 function entradaHumana(p, team) {
-  let ax = 0, ay = 0;
+  let ax = 0, ay = 0, correndo = false;
   if (team === 0) {
     if (teclas['a']) ax -= 1; if (teclas['d']) ax += 1;
     if (teclas['w']) ay -= 1; if (teclas['s']) ay += 1;
@@ -439,13 +480,13 @@ function entradaHumana(p, team) {
       if (teclas['arrowup']) ay -= 1; if (teclas['arrowdown']) ay += 1;
     }
     if (joy.on) { ax += joy.dx; ay += joy.dy; }
+    correndo = shiftL || (modo === 'cpu' && shiftR) || (joy.on && Math.hypot(joy.dx, joy.dy) > 0.92);
   } else {
     if (teclas['arrowleft']) ax -= 1; if (teclas['arrowright']) ax += 1;
     if (teclas['arrowup']) ay -= 1; if (teclas['arrowdown']) ay += 1;
+    if (joy2.on) { ax += joy2.dx; ay += joy2.dy; }
+    correndo = shiftR || (joy2.on && Math.hypot(joy2.dx, joy2.dy) > 0.92);
   }
-  const correndo = team === 0
-    ? (teclas['shift'] || (joy.on && Math.hypot(joy.dx, joy.dy) > 0.92))
-    : teclas['shift'];
   const l = Math.hypot(ax, ay);
   if (l > 0.1) {
     let v = p.velBase * (correndo && p.stamina > 0.05 ? 1.5 : 1);
@@ -607,12 +648,16 @@ function desenharSombra(x, y, r) {
 function desenharJogador(p) {
   const correndo = Math.hypot(p.vx, p.vy) > 0.6;
   const balanco = correndo ? Math.sin(p.anim * 2.2) * 3 : Math.sin(p.anim * 0.4) * 1;
-  // indicador de controlado
+  // indicador de controlado: P1 = anel branco, P2 = anel amarelo
   if (p.controle) {
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+    const ehP2 = p.team === 1;
+    ctx.strokeStyle = ehP2 ? '#ffd400' : '#fff'; ctx.lineWidth = 3;
     ctx.setLineDash([6, 4]);
     ctx.beginPath(); ctx.arc(p.x, p.y, PR + 7 + Math.sin(performance.now() / 200) * 2, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
+    ctx.fillStyle = ehP2 ? '#ffd400' : '#fff';
+    ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(ehP2 ? 'P2' : 'P1', p.x, p.y - PR - 13);
   }
   // pernas (animação corrida)
   ctx.strokeStyle = '#222'; ctx.lineWidth = 5; ctx.lineCap = 'round';
@@ -675,7 +720,7 @@ function loop(t) {
     if (tempoRest <= 0) {
       tempoRest = 0; jogando = false;
       somApito(3);
-      const v = golsA > golsV ? '🔵 AZUL VENCEU! 🏆' : golsV > golsA ? '🔴 VERMELHO VENCEU! 🏆' : '🤝 EMPATE!';
+      const v = golsA > golsV ? (modo === '2p' ? '🔵 P1 (AZUL) VENCEU! 🏆' : '🔵 AZUL VENCEU! 🏆') : golsV > golsA ? (modo === '2p' ? '🔴 P2 (VERMELHO) VENCEU! 🏆' : '🔴 VERMELHO VENCEU! 🏆') : '🤝 EMPATE!';
       mensagem('FIM DE JOGO — ' + v, 999);
     }
     passoFisica(dt);
@@ -696,7 +741,8 @@ document.getElementById('btnSom').addEventListener('click', e => {
   somLigado = !somLigado;
   e.target.textContent = somLigado ? '🔊 Som' : '🔇 Mudo';
 });
-elModo.addEventListener('change', () => { if (!jogando) iniciar(); });
+elModo.addEventListener('change', iniciar);
+elDur.addEventListener('change', iniciar);
 
 // estado inicial (vitrine)
 times = [formarTime(0), formarTime(1)];
