@@ -52,7 +52,8 @@
   <div id="controles">
     <select id="modo">
       <option value="cpu">1 Jogador (Azul vs CPU)</option>
-      <option value="2p">2 Jogadores (mesmo teclado)</option>
+      <option value="2p">2 Jogadores — P1 x P2 (5x5)</option>
+      <option value="x1">X1 — P1 x P2 (1 contra 1)</option>
     </select>
     <select id="duracao">
       <option value="120">2 min</option>
@@ -76,7 +77,7 @@
   </div>
 
   <div id="ajuda">
-    <p>👥 <b>2 JOGADORES ao mesmo tempo:</b> escolha <b>"2 Jogadores"</b> acima e aperte <b>Iniciar</b>. O <b>P1</b> controla o azul (anel <b style="color:#fff">branco</b>) e o <b>P2</b> controla o vermelho (anel <b style="color:#ffd400">amarelo</b>) — cada um troca sozinho para o jogador mais perto da bola.</p>
+    <p>👥 <b>2 JOGADORES um contra o outro:</b> escolha <b>"2 Jogadores — P1 x P2 (5x5)"</b> para duelo de times, ou <b>"X1 — P1 x P2"</b> para 1 contra 1 puro, e aperte <b>Iniciar</b>. O <b>P1</b> é o azul (anel <b style="color:#fff">branco</b>) e o <b>P2</b> é o vermelho (anel <b style="color:#ffd400">amarelo</b>).</p>
     <p>🔵 <b>P1 (Azul):</b> <b>W A S D</b> mover • <b>Shift Esquerdo</b> correr • segure <b>ESPAÇO</b> e solte p/ chutar • <b>Q</b> passe.</p>
     <p>🔴 <b>P2 (Vermelho):</b> <b>Setas ←↑↓→</b> mover • <b>Shift Direito</b> correr • segure <b>ENTER</b> e solte p/ chutar • <b>.</b> (ponto) passe.</p>
     <p>📱 <b>No celular (2 jogadores):</b> um dedo arrasta do <b>lado esquerdo</b> = move o P1, outro dedo arrasta do <b>lado direito</b> = move o P2. Use os botões <b>CHUTE/PASSE</b> (P1, canto direito) e <b>CHUTE P2/PASSE P2</b> (P2, canto esquerdo).</p>
@@ -157,6 +158,28 @@ function formarTime(lado) { // lado: 0 azul (ataca ->), 1 vermelho (ataca <-)
   }));
 }
 
+// PvP = duas pessoas jogando uma contra a outra (2p ou x1)
+function ehPvP() { return modo === '2p' || modo === 'x1'; }
+function nomeT(t) { return t === 0 ? (ehPvP() ? 'o P1 (AZUL)' : 'o AZUL') : (ehPvP() ? 'o P2 (VERMELHO)' : 'o VERMELHO'); }
+function atacante(t) { return times[t][times[t].length - 1]; }
+function goleiro(t) { return times[t][0]; }
+
+// X1: só P1 contra P2, sem goleiros nem ajudantes
+function formarX1(lado) { // lado: 0 azul (ataca ->), 1 vermelho (ataca <-)
+  const e = lado === 0;
+  const f = { role: 'X1', hx: 0.42, hy: 0.50, vel: 5.0, num: 10 };
+  const bx = e ? FX + FW * f.hx : FX + FW * (1 - f.hx);
+  return [{
+    team: lado, idx: 0, role: f.role, num: f.num, velBase: f.vel,
+    hx: bx, hy: FY + FH * f.hy,
+    x: bx, y: FY + FH * f.hy, vx: 0, vy: 0,
+    face: e ? 0 : Math.PI, stamina: 1, anim: Math.random() * 10,
+    controle: false, tackleCd: 0,
+    cor: lado === 0 ? '#1e6bff' : '#e02626',
+    corShort: lado === 0 ? '#ffffff' : '#111111',
+  }];
+}
+
 function resetPosicoes(kickoffTeam = -1) {
   times.forEach(ts => ts.forEach(p => {
     p.x = p.hx; p.y = p.hy; p.vx = 0; p.vy = 0; p.stamina = 1;
@@ -164,22 +187,22 @@ function resetPosicoes(kickoffTeam = -1) {
   }));
   bola.x = FX + FW / 2; bola.y = FY + FH / 2;
   bola.vx = 0; bola.vy = 0; bola.spin = 0; bola.ang = 0; bola.lastTouch = -1;
-  if (kickoffTeam === 0) { times[0][4].x = bola.x - 22; times[0][4].y = bola.y; times[1][4].x = bola.x + 90; }
-  if (kickoffTeam === 1) { times[1][4].x = bola.x + 22; times[1][4].y = bola.y; times[0][4].x = bola.x - 90; }
+  if (kickoffTeam === 0) { atacante(0).x = bola.x - 22; atacante(0).y = bola.y; atacante(1).x = bola.x + 90; }
+  if (kickoffTeam === 1) { atacante(1).x = bola.x + 22; atacante(1).y = bola.y; atacante(0).x = bola.x - 90; }
 }
 
 function iniciar() {
   modo = elModo.value; tempoTotal = parseInt(elDur.value, 10);
-  times = [formarTime(0), formarTime(1)];
+  times = modo === 'x1' ? [formarX1(0), formarX1(1)] : [formarTime(0), formarTime(1)];
   bola = { x: FX + FW / 2, y: FY + FH / 2, vx: 0, vy: 0, spin: 0, ang: 0, lastTouch: -1 };
   golsA = 0; golsV = 0; tempoRest = tempoTotal; jogando = true;
   confetes = []; charge.p1 = 0; charge.p2 = 0;
   resetPosicoes(0);
-  ctrlA = times[0][4]; ctrlV = times[1][4];
-  document.getElementById('btnsMobile2').style.display = modo === '2p' ? 'flex' : 'none';
-  document.getElementById('btnChute').textContent = modo === '2p' ? 'CHUTE P1' : 'CHUTE';
-  document.getElementById('btnPasse').textContent = modo === '2p' ? 'PASSE P1' : 'PASSE';
-  mensagem(modo === '2p' ? 'P1 (AZUL) x P2 (VERMELHO) — COMEÇA! ⚽' : 'COMEÇA O JOGO! ⚽', 2);
+  ctrlA = atacante(0); ctrlV = atacante(1);
+  document.getElementById('btnsMobile2').style.display = ehPvP() ? 'flex' : 'none';
+  document.getElementById('btnChute').textContent = ehPvP() ? 'CHUTE P1' : 'CHUTE';
+  document.getElementById('btnPasse').textContent = ehPvP() ? 'PASSE P1' : 'PASSE';
+  mensagem(ehPvP() ? 'P1 (AZUL) x P2 (VERMELHO) — COMEÇA! ⚽' : 'COMEÇA O JOGO! ⚽', 2);
   somApito(1);
   ultimoT = performance.now();
   atualizarPlacar();
@@ -187,8 +210,8 @@ function iniciar() {
 
 function mensagem(t, seg = 1.6) { elMsg.textContent = t; msgTimer = seg; }
 function atualizarPlacar() {
-  elAzul.textContent = modo === '2p' ? `🔵 P1 AZUL ${golsA}` : `🔵 AZUL ${golsA}`;
-  elVermelho.textContent = modo === '2p' ? `P2 VERMELHO ${golsV} 🔴` : `VERMELHO ${golsV} 🔴`;
+  elAzul.textContent = ehPvP() ? `🔵 P1 AZUL ${golsA}` : `🔵 AZUL ${golsA}`;
+  elVermelho.textContent = ehPvP() ? `P2 VERMELHO ${golsV} 🔴` : `VERMELHO ${golsV} 🔴`;
   const m = String(Math.floor(Math.max(0, tempoRest) / 60)).padStart(2, '0');
   const s = String(Math.floor(Math.max(0, tempoRest) % 60)).padStart(2, '0');
   elTempo.textContent = `${m}:${s}`;
@@ -205,7 +228,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'ShiftRight') shiftR = true;
   if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
   if (k === ' ' && !charge.p1On && jogando) { charge.p1On = true; charge.p1 = 0; }
-  if (k === 'enter' && !charge.p2On && jogando && modo === '2p') { charge.p2On = true; charge.p2 = 0; }
+  if (k === 'enter' && !charge.p2On && jogando && ehPvP()) { charge.p2On = true; charge.p2 = 0; }
   if (!e.repeat) {
     if (k === 'q' || k === 'f') passe(0);
     if (k === '.' || k === '/' || k === ',') passe(1);
@@ -234,7 +257,7 @@ canvas.addEventListener('touchstart', e => {
     const lx = (t.clientX - r.left) / r.width;
     if (lx < 0.45 && !joy.on) {
       joy.on = true; joy.id = t.identifier; joy.sx = t.clientX; joy.sy = t.clientY; joy.dx = 0; joy.dy = 0;
-    } else if (lx >= 0.45 && modo === '2p' && !joy2.on) {
+    } else if (lx >= 0.45 && ehPvP() && !joy2.on) {
       joy2.on = true; joy2.id = t.identifier; joy2.sx = t.clientX; joy2.sy = t.clientY; joy2.dx = 0; joy2.dy = 0;
     } else if (!joy.on) {
       joy.on = true; joy.id = t.identifier; joy.sx = t.clientX; joy.sy = t.clientY; joy.dx = 0; joy.dy = 0;
@@ -393,10 +416,11 @@ function passoFisica(dt) {
 
   // entrada humana
   if (ctrlA) entradaHumana(ctrlA, 0);
-  if (modo === '2p' && ctrlV) entradaHumana(ctrlV, 1);
+  if (ehPvP() && ctrlV) entradaHumana(ctrlV, 1);
 
   iaTime(0, true);
-  iaTime(1, modo === 'cpu');
+  // time 1: sem IA nos duelistas humanos (2p/x1); com IA total contra a CPU
+  iaTime(1, ehPvP());
 
   for (const ts of times) for (const p of ts) {
     p.x += p.vx; p.y += p.vy; p.vx *= 0.90; p.vy *= 0.90;
@@ -464,9 +488,9 @@ function passoFisica(dt) {
   // troca automática de controlado
   if (jogando) {
     ctrlA = controlado(0);
-    ctrlV = modo === '2p' ? controlado(1) : times[1].reduce((a, b) => dist(b, bola) < dist(a, bola) ? b : a);
+    ctrlV = controlado(1);
     times[0].forEach(p => p.controle = (p === ctrlA));
-    times[1].forEach(p => p.controle = (modo === '2p' && p === ctrlV));
+    times[1].forEach(p => p.controle = (ehPvP() && p === ctrlV));
   }
 }
 
@@ -508,7 +532,7 @@ function lateral() {
   bola.vx = 0; bola.vy = 0; bola.spin = 0;
   const t = times[favorecido].reduce((a, b) => dist(b, bola) < dist(a, bola) ? b : a);
   t.x = bola.x + (favorecido === 0 ? -20 : 20); t.y = bola.y;
-  mensagem(`↔ Lateral para ${favorecido === 0 ? 'o AZUL' : 'o VERMELHO'}`, 1.4);
+  mensagem(`↔ Lateral para ${nomeT(favorecido)}`, 1.4);
   beep(700, 0.1, 0.2);
 }
 function tiroDeMetaOuEscanteio() {
@@ -520,15 +544,15 @@ function tiroDeMetaOuEscanteio() {
     bola.x = ladoEsq ? FX + 22 : FX + FW - 22;
     bola.y = (bola.y < FY + FH / 2 ? FY + 24 : FY + FH - 24);
     bola.vx = 0; bola.vy = 0; bola.spin = 0;
-    const c = times[atk][4]; c.x = bola.x + (atk === 0 ? -22 : 22); c.y = bola.y;
-    mensagem(`🚩 Escanteio para ${atk === 0 ? 'o AZUL' : 'o VERMELHO'}!`, 1.6);
+    const c = atacante(atk); c.x = bola.x + (atk === 0 ? -22 : 22); c.y = bola.y;
+    mensagem(`🚩 Escanteio para ${nomeT(atk)}!`, 1.6);
   } else {
     // tiro de meta
     const def = ladoEsq ? 0 : 1;
     bola.x = ladoEsq ? FX + 70 : FX + FW - 70;
     bola.y = FY + FH / 2; bola.vx = 0; bola.vy = 0; bola.spin = 0;
-    const g = times[def][0]; g.x = bola.x; g.y = bola.y + 20;
-    mensagem(`🥅 Tiro de meta para ${def === 0 ? 'o AZUL' : 'o VERMELHO'}`, 1.6);
+    const g = goleiro(def); g.x = bola.x; g.y = bola.y + 20;
+    mensagem(`🥅 Tiro de meta para ${nomeT(def)}`, 1.6);
   }
   beep(600, 0.12, 0.2);
 }
@@ -538,7 +562,7 @@ function gol(team) {
   if (team === 0) golsA++; else golsV++;
   jogando = false; // pausa curta
   somGol(); cameraShake = 8;
-  mensagem(team === 0 ? '⚽ GOOOOL DO AZUL!!! 🎉' : '⚽ GOOOOL DO VERMELHO!!! 🎉', 2.5);
+  mensagem(team === 0 ? `⚽ GOOOOL D${ehPvP() ? 'O P1' : 'O AZUL'}!!! 🎉` : `⚽ GOOOOL D${ehPvP() ? 'O P2' : 'O VERMELHO'}!!! 🎉`, 2.5);
   for (let i = 0; i < 120; i++) confetes.push({
     x: bola.x, y: bola.y,
     vx: (Math.random() - 0.5) * 7, vy: Math.random() * -6 - 1,
@@ -720,7 +744,7 @@ function loop(t) {
     if (tempoRest <= 0) {
       tempoRest = 0; jogando = false;
       somApito(3);
-      const v = golsA > golsV ? (modo === '2p' ? '🔵 P1 (AZUL) VENCEU! 🏆' : '🔵 AZUL VENCEU! 🏆') : golsV > golsA ? (modo === '2p' ? '🔴 P2 (VERMELHO) VENCEU! 🏆' : '🔴 VERMELHO VENCEU! 🏆') : '🤝 EMPATE!';
+      const v = golsA > golsV ? (ehPvP() ? '🔵 P1 (AZUL) VENCEU! 🏆' : '🔵 AZUL VENCEU! 🏆') : golsV > golsA ? (ehPvP() ? '🔴 P2 (VERMELHO) VENCEU! 🏆' : '🔴 VERMELHO VENCEU! 🏆') : '🤝 EMPATE!';
       mensagem('FIM DE JOGO — ' + v, 999);
     }
     passoFisica(dt);
