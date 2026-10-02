@@ -54,6 +54,7 @@
       <option value="cpu">1 Jogador (P1 vs CPU)</option>
       <option value="2p">2 Jogadores — P1 x P2 (5x5)</option>
       <option value="x1">X1 — P1 x P2 (1 contra 1)</option>
+      <option value="demo">🎥 Demonstração (IA x IA)</option>
     </select>
     <select id="duracao">
       <option value="120">2 min</option>
@@ -91,6 +92,7 @@
     <p>📱 <b>No celular (2 jogadores):</b> um dedo arrasta do <b>lado esquerdo</b> = move o P1, outro dedo arrasta do <b>lado direito</b> = move o P2. Use os botões <b>CHUTE/PASSE</b> (P1, canto direito) e <b>CHUTE P2/PASSE P2</b> (P2, canto esquerdo).</p>
     <p>👕 <b>Escolha os times:</b> P1 escolhe o seu time e o P2 (ou a CPU) escolhe o dele — Brasil, Argentina, França, Alemanha, Espanha, Portugal, Holanda ou Inglaterra. Se os dois escolherem o mesmo, o P2 joga de cinza (uniforme reserva). Aperte <b>Iniciar</b> após escolher!</p>
     <p>🎮 <b>Escolha seu jogador:</b> em <b>"P1 joga com"</b> e <b>"P2 joga com"</b> dá para jogar no <b>Automático</b> (troca sozinho para quem está mais perto da bola) ou travar num jogador fixo — <b>Goleiro 1, Zagueiro 2, Zagueiro 4, Meia 8 ou Atacante 9</b>. Quer ser o goleiro e defender tudo? É só escolher! (No X1 não precisa: cada um já tem seu único jogador.)</p>
+    <p>🎥 <b>IA no jogo:</b> escolha <b>"Demonstração (IA x IA)"</b> e aperte Iniciar para assistir a IA jogando sozinha dos dois lados — dá até para escolher os times que ela vai usar!</p>
     <p>📏 <b>Realismo:</b> 5x5 com goleiros, lateral, escanteio, tiro de meta, drible colado no pé, curva na bola (efeito), cansaço, rede do gol, torcida e confete no gol.</p>
   </div>
 
@@ -138,12 +140,15 @@ function popularTimes() {
   elTimeP1.value = selA; elTimeP2.value = selB;
 }
 function atualizarLabelsTimes() {
+  const demo = ehDemo(), pvp = ehPvP();
   const l2 = document.getElementById('labelTime2');
-  if (l2) l2.childNodes[0].textContent = ehPvP() ? '🔴 P2: ' : '🔴 CPU: ';
+  if (l2) l2.childNodes[0].textContent = demo ? '🔴 IA 2: ' : pvp ? '🔴 P2: ' : '🔴 CPU: ';
+  const c1 = document.getElementById('ctrlP1');
+  if (c1) c1.disabled = demo;
   const c2 = document.getElementById('ctrlP2');
-  if (c2) c2.disabled = !ehPvP();
+  if (c2) c2.disabled = demo || !pvp;
   const lc2 = document.getElementById('labelCtrl2');
-  if (lc2) lc2.style.opacity = ehPvP() ? '1' : '0.4';
+  if (lc2) lc2.style.opacity = pvp && !demo ? '1' : '0.4';
 }
 
 // ---------- ESCOLHA DO JOGADOR CONTROLADO ----------
@@ -229,6 +234,7 @@ function formarTime(lado) { // lado: 0 = P1 (ataca ->), 1 = P2/CPU (ataca <-)
 
 // PvP = duas pessoas jogando uma contra a outra (2p ou x1)
 function ehPvP() { return modo === '2p' || modo === 'x1'; }
+function ehDemo() { return modo === 'demo'; }
 function nomeT(t) { const n = nomeEscolhido(t); return ehPvP() ? (t === 0 ? `o P1 (${n})` : `o P2 (${n})`) : `o ${n}`; }
 function atacante(t) { return times[t][times[t].length - 1]; }
 function goleiro(t) { return times[t][0]; }
@@ -275,10 +281,12 @@ function iniciar() {
   confetes = []; charge.p1 = 0; charge.p2 = 0;
   resetPosicoes(0);
   ctrlA = atacante(0); ctrlV = atacante(1);
+  if (ehDemo()) { ctrlA = null; ctrlV = null; } // IA joga sozinha, sem humanos
+  document.getElementById('btnsMobile').style.display = ehDemo() ? 'none' : '';
   document.getElementById('btnsMobile2').style.display = ehPvP() ? 'flex' : 'none';
   document.getElementById('btnChute').textContent = ehPvP() ? 'CHUTE P1' : 'CHUTE';
   document.getElementById('btnPasse').textContent = ehPvP() ? 'PASSE P1' : 'PASSE';
-  mensagem(ehPvP() ? 'P1 (AZUL) x P2 (VERMELHO) — COMEÇA! ⚽' : 'COMEÇA O JOGO! ⚽', 2);
+  mensagem(ehDemo() ? 'DEMONSTRAÇÃO: IA x IA! 🍿⚽' : ehPvP() ? 'P1 (AZUL) x P2 (VERMELHO) — COMEÇA! ⚽' : 'COMEÇA O JOGO! ⚽', 2);
   somApito(1);
   ultimoT = performance.now();
   atualizarPlacar();
@@ -564,11 +572,18 @@ function passoFisica(dt) {
   if (bola.y < FY - 4 || bola.y > FY + FH + 4) lateral();
 
   // quem cada pessoa controla: fixo (escolhido) ou automático (mais perto da bola)
+  // no modo demonstração a IA controla todo mundo sozinha
   if (jogando) {
-    ctrlA = (fixoA >= 0 && times[0][fixoA]) ? times[0][fixoA] : controlado(0);
-    ctrlV = (ehPvP() && fixoB >= 0 && times[1][fixoB]) ? times[1][fixoB] : controlado(1);
+    if (ehDemo()) {
+      ctrlA = null; ctrlV = null;
+      times[0].forEach(p => p.controle = false);
+      times[1].forEach(p => p.controle = false);
+    } else {
+      ctrlA = (fixoA >= 0 && times[0][fixoA]) ? times[0][fixoA] : controlado(0);
+      ctrlV = (ehPvP() && fixoB >= 0 && times[1][fixoB]) ? times[1][fixoB] : controlado(1);
     times[0].forEach(p => p.controle = (p === ctrlA));
     times[1].forEach(p => p.controle = (ehPvP() && p === ctrlV));
+    }
   }
 }
 
